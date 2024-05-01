@@ -106,5 +106,8 @@ func initializeRoutes() *http.ServeMux {
 	GetCat := http.HandlerFunc(httpmux.GetCat)
 	mux.Handle("GET /v1/cat", authMiddleware(GetCat))
 
+	DeleteCat := http.HandlerFunc(httpmux.DestroyCat)
+	mux.Handle("DELETE /v1/cat/{id}", authMiddleware(DeleteCat))
+
 	return mux
 }

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/malikfajr/cats-social/exception"
 	"github.com/malikfajr/cats-social/helper"
 	"github.com/malikfajr/cats-social/models"
 )
@@ -71,4 +72,63 @@ func GetCat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	helper.WriteToResponseBody(w, wrapper, http.StatusOK)
+}
+
+func DestroyCat(w http.ResponseWriter, r *http.Request) {
+	email := r.Header.Get("email")
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		panic(exception.NewNotFoundError("id not found"))
+	}
+
+	tx := models.StartTx()
+	defer helper.CommitOrRollback(tx)
+
+	err = models.DestroyCat(r.Context(), tx, id, email)
+	if err != nil {
+		panic(exception.NewNotFoundError("id is not found"))
+	}
+
+	wrapper := helper.WebResponse{
+		Message: "success",
+		Data:    nil,
+	}
+
+	helper.WriteToResponseBody(w, wrapper, http.StatusOK)
+}
+
+func UpdateCat(w http.ResponseWriter, r *http.Request) {
+	catRequest := models.CatInsertRequest{}
+
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		panic(exception.NewNotFoundError("id is not found"))
+	}
+
+	json.NewDecoder(r.Body).Decode(&catRequest)
+
+	err = validate.Struct(catRequest)
+	helper.PanicIfError(err)
+
+	catRequest.UserEmail = r.Header.Get("email")
+
+	tx := models.StartTx()
+	defer helper.CommitOrRollback(tx)
+
+	// TODO: Check when cat is already requested to match
+	//
+	//
+
+	err = models.UpdateCat(r.Context(), tx, id, catRequest)
+
+	wraper := helper.WebResponse{
+		Message: "success",
+		Data: map[string]interface{}{
+			"id": fmt.Sprintf("%d", id),
+		},
+	}
+
+	helper.WriteToResponseBody(w, wraper, http.StatusCreated)
 }

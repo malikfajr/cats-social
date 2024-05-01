@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 	"strconv"
 	"time"
 
@@ -170,14 +169,25 @@ func GetCatById(ctx context.Context, tx *sql.Tx, Id int) (Cat, error) {
 	}
 
 	row.Scan(&cat.Id, &cat.Name, &cat.Race, &cat.Sex, &cat.AgeInMonth, &cat.ImageUrls, &cat.Description, &cat.HasMatched, &cat.CreatedAt)
-	log.Println(cat)
+
 	cat.CreatedAt.Format(time.RFC3339)
 	return cat, nil
 }
 
-func DestroyCat(ctx context.Context, tx *sql.Tx, Id int) {
-	SQL := "DELETE FROM cats WHERE id = $1;"
+func DestroyCat(ctx context.Context, tx *sql.Tx, id int, email string) error {
+	status := 0
+	SQL := "DELETE FROM cats WHERE id = $1 AND user_email = $2 RETURNING id;"
 
-	_, err := tx.ExecContext(ctx, SQL, Id)
-	helper.PanicIfError(err)
+	err := tx.QueryRowContext(ctx, SQL, id, email).Scan(&status)
+
+	return err
+}
+
+func UpdateCat(ctx context.Context, tx *sql.Tx, id int, cat CatInsertRequest) error {
+	SQL := "UPDATE cats SET name = $1, race = $2, sex = $3, age_in_month = $4, image_urls = $5, description = $6 WHERE id = $7 AND user_email $8 RETURNING id"
+	status := 0
+
+	err := tx.QueryRowContext(ctx, SQL, cat.Name, cat.Race, cat.Sex, cat.AgeInMonth, pq.Array(cat.ImageUrls), cat.Description, id, cat.UserEmail).Scan(&status)
+
+	return err
 }
