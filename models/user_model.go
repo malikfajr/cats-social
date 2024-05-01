@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 
 	"github.com/malikfajr/cats-social/helper"
 )
@@ -18,10 +17,9 @@ type User struct {
 func SaveUser(ctx context.Context, tx *sql.Tx, user User) User {
 	SQL := "INSERT INTO users (email, name, password) VALUES ($1, $2, $3);"
 
-	result, err := tx.ExecContext(ctx, SQL, user.Email, user.Name, user.Password)
+	_, err := tx.ExecContext(ctx, SQL, user.Email, user.Name, user.Password)
 	helper.PanicIfError(err)
 
-	fmt.Println(result)
 	return user
 }
 

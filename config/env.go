@@ -7,14 +7,14 @@ import (
 )
 
 type Config struct {
-	db_name     string
+	BCRYPT_SALT int
 	db_port     int
+	db_name     string
 	db_host     string
 	db_username string
 	db_password string
 	db_params   string
 	JWT_SECRET  string
-	BCRYPT_SALT int
 }
 
 var Env Config

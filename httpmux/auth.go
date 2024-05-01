@@ -2,7 +2,6 @@ package httpmux
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
 	"time"
 
@@ -22,13 +21,9 @@ type Credential struct {
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	credential := Credential{}
 
-	err := json.NewDecoder(r.Body).Decode(&credential)
-	if err == io.EOF {
-		panic(exception.NewBadRequestError("missing data"))
-	}
-	helper.PanicIfError(err)
+	json.NewDecoder(r.Body).Decode(&credential)
 
-	err = validate.Struct(credential)
+	err := validate.Struct(credential)
 	helper.PanicIfError(err)
 
 	tx := models.StartTx()
@@ -62,14 +57,10 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	user := models.User{}
 
 	// parsing body
-	err := json.NewDecoder(r.Body).Decode(&user)
-	if err == io.EOF {
-		panic(exception.NewBadRequestError("missing data"))
-	}
-	helper.PanicIfError(err)
+	json.NewDecoder(r.Body).Decode(&user)
 
 	// validation json
-	err = validate.Struct(user)
+	err := validate.Struct(user)
 	helper.PanicIfError(err)
 
 	hashPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), config.Env.BCRYPT_SALT)
@@ -90,7 +81,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	data := map[string]string{
 		"email":       newUser.Email,
 		"name":        newUser.Name,
-		"accessToken": generateToken(newUser.Name),
+		"accessToken": generateToken(newUser.Email),
 	}
 
 	wrapper := helper.WebResponse{

@@ -59,6 +59,7 @@ func authMiddleware(next http.Handler) http.Handler {
 
 		if authorization == "" {
 			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte("invalid token"))
 			return
 		}
 
@@ -69,6 +70,7 @@ func authMiddleware(next http.Handler) http.Handler {
 		})
 		if err != nil {
 			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte("invalid token"))
 			return
 		}
 		if claims, ok := token.Claims.(*config.CustomJWTClaim); ok {
@@ -76,6 +78,7 @@ func authMiddleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		} else {
 			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte("invalid token"))
 			return
 		}
 	})
@@ -97,8 +100,11 @@ func initializeRoutes() *http.ServeMux {
 	mux.HandleFunc("POST /v1/user/register", httpmux.RegisterHandler)
 	mux.HandleFunc("POST /v1/user/login", httpmux.LoginHandler)
 
-	check := http.HandlerFunc(httpmux.Check)
-	mux.Handle("GET /check", authMiddleware(check))
+	SaveCat := http.HandlerFunc(httpmux.SaveCat)
+	mux.Handle("POST /v1/cat", authMiddleware(SaveCat))
+
+	GetCat := http.HandlerFunc(httpmux.GetCat)
+	mux.Handle("GET /v1/cat", authMiddleware(GetCat))
 
 	return mux
 }
