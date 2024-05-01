@@ -42,7 +42,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	data := map[string]string{
 		"email":       user.Email,
 		"name":        user.Name,
-		"accessToken": generateToken(user.Email),
+		"accessToken": generateToken(user.Email, user.Name),
 	}
 
 	wrapper := helper.WebResponse{
@@ -81,7 +81,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	data := map[string]string{
 		"email":       newUser.Email,
 		"name":        newUser.Name,
-		"accessToken": generateToken(newUser.Email),
+		"accessToken": generateToken(newUser.Email, newUser.Name),
 	}
 
 	wrapper := helper.WebResponse{
@@ -92,9 +92,10 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	helper.WriteToResponseBody(w, wrapper, http.StatusCreated)
 }
 
-func generateToken(email string) string {
+func generateToken(email string, name string) string {
 	myClaims := config.CustomJWTClaim{
 		Email: email,
+		Name:  name,
 		Exp:   jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS512, myClaims)

@@ -75,6 +75,7 @@ func authMiddleware(next http.Handler) http.Handler {
 		}
 		if claims, ok := token.Claims.(*config.CustomJWTClaim); ok {
 			r.Header.Set("email", claims.Email)
+			r.Header.Set("name", claims.Name)
 			next.ServeHTTP(w, r)
 		} else {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -94,7 +95,7 @@ func initializeRoutes() *http.ServeMux {
 			return
 		}
 
-		fmt.Fprint(w, "ini ya home")
+		fmt.Fprint(w, "hello world")
 	})
 
 	mux.HandleFunc("POST /v1/user/register", httpmux.RegisterHandler)
@@ -105,6 +106,12 @@ func initializeRoutes() *http.ServeMux {
 
 	GetCat := http.HandlerFunc(httpmux.GetCat)
 	mux.Handle("GET /v1/cat", authMiddleware(GetCat))
+
+	NewMatch := http.HandlerFunc(httpmux.CreateMatch)
+	mux.Handle("POST /v1/cat/match", authMiddleware(NewMatch))
+
+	UpdateCat := http.HandlerFunc(httpmux.UpdateCat)
+	mux.Handle("PUT /v1/cat/{id}", authMiddleware(UpdateCat))
 
 	DeleteCat := http.HandlerFunc(httpmux.DestroyCat)
 	mux.Handle("DELETE /v1/cat/{id}", authMiddleware(DeleteCat))

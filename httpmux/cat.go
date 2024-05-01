@@ -42,12 +42,12 @@ func GetCat(w http.ResponseWriter, r *http.Request) {
 		Id:            r.URL.Query().Get("id"),
 		Owned:         r.URL.Query().Get("owned"),
 		Email:         r.Header.Get("email"),
-		AgeStr:        r.Header.Get("ageInMonth"),
-		HasMatchedStr: r.Header.Get("hasMatched"),
-		Race:          r.Header.Get("race"),
-		Search:        r.Header.Get("search"),
-		Limit:         r.Header.Get("limit"),
-		Offsset:       r.Header.Get("offset"),
+		AgeStr:        r.URL.Query().Get("ageInMonth"),
+		HasMatchedStr: r.URL.Query().Get("hasMatched"),
+		Race:          r.URL.Query().Get("race"),
+		Search:        r.URL.Query().Get("search"),
+		Limit:         r.URL.Query().Get("limit"),
+		Offsset:       r.URL.Query().Get("offset"),
 	}
 
 	tx := models.StartTx()

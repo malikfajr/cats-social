@@ -14,7 +14,7 @@ import (
 
 type Cat struct {
 	Id          string    `json:"id"`
-	UserEmail   string    `json:"userEmail"`
+	UserEmail   string    `json:"-"`
 	Name        string    `json:"name"`
 	Race        string    `json:"race"`
 	Sex         string    `json:"sex"`
@@ -68,15 +68,15 @@ func GetAllCat(ctx context.Context, tx *sql.Tx, catParam CatParam) []Cat {
 
 	if catParam.Owned != "" {
 		owned, err := strconv.ParseBool(catParam.Owned)
-		helper.PanicIfError(err)
+		if err == nil {
+			if owned == true {
+				SQL += " AND user_email = $1"
+			} else {
+				SQL += " AND user_email != $1 "
+			}
 
-		if owned == true {
-			SQL += " AND user_email = $1"
-		} else {
-			SQL += " AND user_email IS != $1 "
+			params = append(params, catParam.Email)
 		}
-
-		params = append(params, catParam.Email)
 	}
 
 	if race := catParam.Race; race != "" {
@@ -91,10 +91,10 @@ func GetAllCat(ctx context.Context, tx *sql.Tx, catParam CatParam) []Cat {
 
 	if hasMatched := catParam.HasMatchedStr; hasMatched != "" {
 		match, err := strconv.ParseBool(hasMatched)
-		helper.PanicIfError(err)
-
-		SQL += fmt.Sprintf(" AND hasMatched = $%d", len(params)+1)
-		params = append(params, match)
+		if err == nil {
+			SQL += fmt.Sprintf(" AND hasMatched = $%d", len(params)+1)
+			params = append(params, match)
+		}
 	}
 
 	if ageStr := catParam.AgeStr; ageStr != "" {
@@ -115,7 +115,7 @@ func GetAllCat(ctx context.Context, tx *sql.Tx, catParam CatParam) []Cat {
 			break
 		default:
 			operator = "="
-			ageValue, err = strconv.Atoi(ageStr[1:])
+			ageValue, err = strconv.Atoi(ageStr)
 			helper.PanicIfError(err)
 		}
 
@@ -158,7 +158,7 @@ func GetAllCat(ctx context.Context, tx *sql.Tx, catParam CatParam) []Cat {
 
 func GetCatById(ctx context.Context, tx *sql.Tx, Id int) (Cat, error) {
 	cat := Cat{}
-	SQL := "SELECT id, name, race, sex, age_in_month, image_urls, description, hasmatched, created_at FROM cats WHERE id = $1;"
+	SQL := "SELECT id, user_email, name, race, sex, age_in_month, image_urls, description, hasmatched, created_at FROM cats WHERE id = $1;"
 
 	row, err := tx.QueryContext(ctx, SQL, Id)
 	helper.PanicIfError(err)
@@ -168,7 +168,7 @@ func GetCatById(ctx context.Context, tx *sql.Tx, Id int) (Cat, error) {
 		return cat, errors.New("cat id is not valid")
 	}
 
-	row.Scan(&cat.Id, &cat.Name, &cat.Race, &cat.Sex, &cat.AgeInMonth, &cat.ImageUrls, &cat.Description, &cat.HasMatched, &cat.CreatedAt)
+	row.Scan(&cat.Id, &cat.UserEmail, &cat.Name, &cat.Race, &cat.Sex, &cat.AgeInMonth, &cat.ImageUrls, &cat.Description, &cat.HasMatched, &cat.CreatedAt)
 
 	cat.CreatedAt.Format(time.RFC3339)
 	return cat, nil
