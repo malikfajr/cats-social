@@ -79,8 +79,12 @@ func badRequestError(writer http.ResponseWriter, request *http.Request, err inte
 func validationError(writer http.ResponseWriter, request *http.Request, err interface{}) bool {
 	exception, ok := err.(validator.ValidationErrors)
 	if ok {
+		message := ""
+		for _, e := range exception {
+			message += fmt.Sprintf(" %s %s;", e.Field(), e.Tag())
+		}
 		webResponse := helper.WebResponse{
-			Message: exception.Error(),
+			Message: message,
 			Data:    nil,
 		}
 

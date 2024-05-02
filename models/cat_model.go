@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/lib/pq"
@@ -79,6 +80,14 @@ func GetAllCat(ctx context.Context, tx *sql.Tx, catParam CatParam) []Cat {
 		}
 	}
 
+	if catParam.Id != "" {
+		id, err := strconv.Atoi(catParam.Id)
+		if err == nil {
+			SQL += fmt.Sprintf(" AND id = $%d", len(params)+1)
+			params = append(params, id)
+		}
+	}
+
 	if race := catParam.Race; race != "" {
 		SQL += fmt.Sprintf(" AND CAST(race AS TEXT) = $%d", len(params)+1)
 		params = append(params, race)
@@ -124,8 +133,8 @@ func GetAllCat(ctx context.Context, tx *sql.Tx, catParam CatParam) []Cat {
 	}
 
 	if search := catParam.Search; search != "" {
-		SQL += fmt.Sprintf(" AND name like $%d", len(params)+1)
-		params = append(params, "%"+search+"%")
+		SQL += fmt.Sprintf(" AND LOWER(name) like $%d", len(params)+1)
+		params = append(params, "%"+strings.ToLower(search)+"%")
 	}
 
 	limit, err := strconv.Atoi(catParam.Limit)
@@ -199,4 +208,12 @@ func UpdateCatWithoutSex(ctx context.Context, tx *sql.Tx, id int, cat CatInsertR
 	err := tx.QueryRowContext(ctx, SQL, cat.Name, cat.Race, cat.AgeInMonth, pq.Array(cat.ImageUrls), cat.Description, id, cat.UserEmail).Scan(&status)
 
 	return err
+}
+
+// update property hasMatched
+func UpdateStatusCat(ctx context.Context, tx *sql.Tx, idCat1 string, idCat2 string) {
+	SQL := "UPDATE cats SET hasMatched = TRUE WHERE id IN ($1, $2)"
+
+	_, err := tx.ExecContext(ctx, SQL, idCat1, idCat2)
+	helper.PanicIfError(err)
 }

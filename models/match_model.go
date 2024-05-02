@@ -10,6 +10,10 @@ import (
 	"github.com/malikfajr/cats-social/helper"
 )
 
+type ApproveRemoveRequest struct {
+	MatchId string `json:"matchId" validate:"required"`
+}
+
 type Issuer struct {
 	Name      string    `json:"name"`
 	Email     string    `json:"email"`
@@ -57,14 +61,14 @@ type MatchInsertRequest struct {
 
 func NewMatch(ctx context.Context, tx *sql.Tx, match Match) (string, error) {
 	var id string = ""
-	SQL := "INSERT INTO matches (match_user_email, issued_by, match_cat_detail, user_cat_detail, message) VALUES ($1, $2, $3, $4, $5) RETURNING id"
+	SQL := "INSERT INTO matches (status, match_user_email, issued_by, match_cat_detail, user_cat_detail, message) VALUES ('pending', $1, $2, $3, $4, $5) RETURNING id"
 
 	issuedBy, _ := match.IssuedBy.toJson()
 	matchCat, _ := match.MatchCatDetail.toJson()
 	userCat, _ := match.UserCatDetail.toJson()
 
-	// err := tx.QueryRowContext(ctx, SQL, match.IssuedBy, pq.Array(match.MatchCatDetail), pq.Array(match.UserCatDetail), match.Message).Scan(&id)
 	err := tx.QueryRowContext(ctx, SQL, match.MatchUserEmail, string(issuedBy), string(matchCat), string(userCat), match.Message).Scan(&id)
+
 	helper.PanicIfError(err)
 
 	return id, err
@@ -72,9 +76,10 @@ func NewMatch(ctx context.Context, tx *sql.Tx, match Match) (string, error) {
 
 func CrossCheckMatchCatId(ctx context.Context, tx *sql.Tx, matchCatId string, userCatId string) int {
 	count := 0
-	SQL := "SELECT COUNT(*) WHERE match_cat_detail->>'id' = $1 AND user_cat_detail->>'id' = $2"
+	SQL := "SELECT COUNT(*) FROM matches WHERE match_cat_detail->>'id' = $1 AND user_cat_detail->>'id' = $2"
 
-	tx.QueryRowContext(ctx, SQL, &count)
+	err := tx.QueryRowContext(ctx, SQL, matchCatId, userCatId).Scan(&count)
+	helper.PanicIfError(err)
 
 	return count
 }
@@ -132,28 +137,47 @@ func DeleteMatch(ctx context.Context, tx *sql.Tx, id string) (string, string, er
 }
 
 func ApproveMatch(ctx context.Context, tx *sql.Tx, matchId string) {
-	SQL := "UPDATE matches SET status = 'approved', match_cat_detail->>'hasMatched' = TRUE, user_cat_detail->>'hasMatched' = TRUE WHERE id = $1"
+	SQL := `UPDATE matches 
+				SET status = 'approved', 
+					match_cat_detail=jsonb_set(match_cat_detail, '{hasMatched}', 'true'), 
+					user_cat_detail=jsonb_set(user_cat_detail, '{hasMatched}', 'true') 
+			WHERE id = $1`
 
 	tx.QueryRowContext(ctx, SQL, matchId).Scan()
-
 }
 
 func RejectMatch(ctx context.Context, tx *sql.Tx, matchId string) {
-	SQL := "UPDATE matches SET status = 'reject', match_cat_detail->>'hasMatched' = TRUE, user_cat_detail->>'hasMatched' = TRUE WHERE id = $1"
+	SQL := "UPDATE matches SET status = 'reject' WHERE id = $1"
 
 	tx.QueryRowContext(ctx, SQL, matchId).Scan()
+}
+
+func RejectOtherMatch(ctx context.Context, tx *sql.Tx, catId string, matchId string) {
+	SQL1 := `UPDATE matches 
+				SET status = 'reject', match_cat_detail=jsonb_set(match_cat_detail, '{hasMatched}', 'true')
+			WHERE id != $1 AND match_cat_detail->>'id' = $2 AND status != 'approved';`
+
+	SQL2 := `UPDATE matches 
+				SET status = 'reject', user_cat_detail=jsonb_set(user_cat_detail, '{hasMatched}', 'true')
+			WHERE id != $1 AND user_cat_detail->>'id' = $2 AND status != 'approved';`
+
+	_, err := tx.ExecContext(ctx, SQL1, matchId, catId)
+	helper.PanicIfError(err)
+
+	_, err = tx.ExecContext(ctx, SQL2, matchId, catId)
+	helper.PanicIfError(err)
 }
 
 func GetMatchById(ctx context.Context, tx *sql.Tx, matchId string) (Match, error) {
 	match := &Match{}
 	var issuedByStr, matchCatDetailStr, userCatDetailStr string
-	SQL := "SELECT id, issued_by, match_cat_detail, user_cat_detail, message, created_at FROM matches WHERE id = $1"
+	SQL := "SELECT id, match_user_email, status, issued_by, match_cat_detail, user_cat_detail, message, created_at FROM matches WHERE id = $1"
 
-	err := tx.QueryRowContext(ctx, SQL, matchId).Scan(&match.Id, &issuedByStr, &matchCatDetailStr, &userCatDetailStr, &match.Message, &match.CreatedAt)
+	err := tx.QueryRowContext(ctx, SQL, matchId).Scan(&match.Id, &match.MatchUserEmail, &match.Status, &issuedByStr, &matchCatDetailStr, &userCatDetailStr, &match.Message, &match.CreatedAt)
 
 	if err == nil {
 		// text to json/struct
-		err = json.Unmarshal([]byte(issuedByStr), &match.IssuedBy)
+		err := json.Unmarshal([]byte(issuedByStr), &match.IssuedBy)
 		if err != nil {
 			log.Println("Error unmarshalling IssuedBy JSON:", err)
 		}

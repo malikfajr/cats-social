@@ -11,6 +11,24 @@ import (
 	"github.com/malikfajr/cats-social/models"
 )
 
+var RaceEnum = map[string]bool{
+	"Persian":           true,
+	"Maine Coon":        true,
+	"Siamese":           true,
+	"Ragdoll":           true,
+	"Bengal":            true,
+	"Sphynx":            true,
+	"British Shorthair": true,
+	"Abyssinian":        true,
+	"Scottish Fold":     true,
+	"Birman":            true,
+}
+
+var SexEnum = map[string]bool{
+	"male":   true,
+	"female": true,
+}
+
 func SaveCat(w http.ResponseWriter, r *http.Request) {
 	catRequest := models.CatInsertRequest{}
 
@@ -37,7 +55,7 @@ func SaveCat(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetCat(w http.ResponseWriter, r *http.Request) {
-	var data interface{}
+	var data []models.Cat = []models.Cat{}
 	catParam := models.CatParam{
 		Id:            r.URL.Query().Get("id"),
 		Owned:         r.URL.Query().Get("owned"),
@@ -45,26 +63,24 @@ func GetCat(w http.ResponseWriter, r *http.Request) {
 		AgeStr:        r.URL.Query().Get("ageInMonth"),
 		HasMatchedStr: r.URL.Query().Get("hasMatched"),
 		Race:          r.URL.Query().Get("race"),
+		Sex:           r.URL.Query().Get("sex"),
 		Search:        r.URL.Query().Get("search"),
 		Limit:         r.URL.Query().Get("limit"),
 		Offsset:       r.URL.Query().Get("offset"),
 	}
 
+	if ok := RaceEnum[catParam.Race]; ok == false {
+		catParam.Race = ""
+	}
+
+	if ok := SexEnum[catParam.Sex]; ok == false {
+		catParam.Sex = ""
+	}
+
 	tx := models.StartTx()
 	defer helper.CommitOrRollback(tx)
 
-	if catParam.Id != "" {
-		id, err := strconv.Atoi(catParam.Id)
-		if err == nil {
-			data, err = models.GetCatById(r.Context(), tx, id)
-			if err != nil {
-				data = nil
-			}
-
-		}
-	} else {
-		data = models.GetAllCat(r.Context(), tx, catParam)
-	}
+	data = models.GetAllCat(r.Context(), tx, catParam)
 
 	wrapper := helper.WebResponse{
 		Message: "success",

@@ -126,7 +126,14 @@ func GetMyMatch(w http.ResponseWriter, r *http.Request) {
 
 func ApproveMatch(w http.ResponseWriter, r *http.Request) {
 	email := r.Header.Get("email")
-	matchId := r.PathValue("id")
+	var bodyRequest models.ApproveRemoveRequest
+
+	json.NewDecoder(r.Body).Decode(&bodyRequest)
+
+	err := validate.Struct(bodyRequest)
+	helper.PanicIfError(err)
+
+	matchId := bodyRequest.MatchId
 
 	tx := models.StartTx()
 	defer helper.CommitOrRollback(tx)
@@ -146,8 +153,10 @@ func ApproveMatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	models.ApproveMatch(r.Context(), tx, matchId)
+	models.RejectOtherMatch(r.Context(), tx, match.MatchCatDetail.Id, matchId)
+	models.RejectOtherMatch(r.Context(), tx, match.UserCatDetail.Id, matchId)
 
-	// TODO: Update cat property and other match status
+	models.UpdateStatusCat(r.Context(), tx, match.MatchCatDetail.Id, match.UserCatDetail.Id)
 
 	helper.WriteToResponseBody(w, nil, http.StatusOK)
 }
@@ -174,8 +183,6 @@ func RejectMatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	models.RejectMatch(r.Context(), tx, matchId)
-
-	// TODO: Update cat property and other match status
 
 	helper.WriteToResponseBody(w, nil, http.StatusOK)
 }
