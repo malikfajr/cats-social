@@ -7,7 +7,6 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/malikfajr/cats-social/config"
-	"github.com/malikfajr/cats-social/exception"
 	"github.com/malikfajr/cats-social/helper"
 	"github.com/malikfajr/cats-social/httpmux"
 	"github.com/malikfajr/cats-social/models"
@@ -21,7 +20,7 @@ func main() {
 	helper.PanicIfError(err)
 
 	router := initializeRoutes()
-	wrapper := use(router, loggingMiddleware, exception.RecoverWrap)
+	wrapper := use(router, loggingMiddleware)
 
 	server := &http.Server{
 		Addr:    ":8080",
@@ -109,6 +108,12 @@ func initializeRoutes() *http.ServeMux {
 
 	NewMatch := http.HandlerFunc(httpmux.CreateMatch)
 	mux.Handle("POST /v1/cat/match", authMiddleware(NewMatch))
+
+	GetMatch := http.HandlerFunc(httpmux.GetMyMatch)
+	mux.Handle("GET /v1/cat/match", authMiddleware(GetMatch))
+
+	DeleteMatch := http.HandlerFunc(httpmux.DeleteMatch)
+	mux.Handle("DELETE /v1/cat/match/{id}", authMiddleware(DeleteMatch))
 
 	UpdateCat := http.HandlerFunc(httpmux.UpdateCat)
 	mux.Handle("PUT /v1/cat/{id}", authMiddleware(UpdateCat))

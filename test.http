@@ -1,0 +1,139 @@
+### Success register 
+# @name user1
+POST http://localhost:8080/v1/user/register HTTP/1.1
+Content-Type: application/json
+
+{
+    "name": "Budi S",
+    "email": "budi@gmail.com",
+    "password": "password"
+}
+
+@token1={{user1.response.body.data.accessToken}}
+
+### Register user 2
+# @name user2
+POST http://localhost:8080/v1/user/register HTTP/1.1
+Content-Type: application/json
+
+{
+    "name": "Andi S",
+    "email": "andi@gmail.com",
+    "password": "password"
+}
+
+@token2={{user2.response.body.data.accessToken}}
+
+### Register user 2
+# @name user3
+POST http://localhost:8080/v1/user/register HTTP/1.1
+Content-Type: application/json
+
+{
+    "name": "Yusuf",
+    "email": "yusuf@gmail.com",
+    "password": "password"
+}
+
+@token3={{user3.response.body.data.accessToken}}
+
+
+### Login success
+# @name login1
+POST http://localhost:8080/v1/user/login HTTP/1.1
+Content-Type: application/json
+
+{
+    "email": "budi@gmail.com",
+    "password": "password"   
+}
+
+@token1={{login1.response.body.data.accessToken}}
+
+### add cat user 1
+POST http://localhost:8080/v1/cat HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer {{token1}}
+
+{
+    "name": "Cat user 1",
+    "race": "Persian",
+    "sex": "male",
+    "ageInMonth": 1,
+    "description": "kucing pertama",
+    "imageUrls": ["http://google.com"]
+}
+
+
+### add cat user 2
+POST http://localhost:8080/v1/cat HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer {{token2}}
+
+{
+    "name": "Cat user 2",
+    "race": "Persian",
+    "sex": "female",
+    "ageInMonth": 1,
+    "description": "kucing pertama",
+    "imageUrls": ["http://google.com"]
+}
+
+
+### add cat user 3
+POST http://localhost:8080/v1/cat HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer {{token3}}
+
+{
+    "name": "Cat user 3",
+    "race": "Persian",
+    "sex": "male",
+    "ageInMonth": 5,
+    "description": "kucing pertama",
+    "imageUrls": ["http://google.com"]
+}
+
+### GET CAT by user1
+GET http://localhost:8080/v1/cat?race=Persian&owned=true HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer {{token1}}
+
+
+### GET CAT by user2
+GET http://localhost:8080/v1/cat?owned=true HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer {{token2}}
+
+
+### GET CAT by user3
+GET http://localhost:8080/v1/cat? HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer {{token3}}
+
+###
+POST  http://localhost:8080/v1/cat/match HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer {{token1}}
+
+{
+    "matchCatId": "3",
+	"userCatId": "2",
+    "message": "Ayo ketemuan"
+}
+
+###
+GET  http://localhost:8080/v1/cat/match HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer {{token3}}
+
+{
+    "matchCatId": "3",
+	"userCatId": "8",
+    "message": "Ayo ketemuan"
+}
+
+### DELETE with other user
+DELETE http://localhost:8080/v1/cat/1 HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer {{token1}}

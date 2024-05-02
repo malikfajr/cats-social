@@ -99,6 +99,7 @@ func DestroyCat(w http.ResponseWriter, r *http.Request) {
 }
 
 func UpdateCat(w http.ResponseWriter, r *http.Request) {
+	email := r.Header.Get("email")
 	catRequest := models.CatInsertRequest{}
 
 	idStr := r.PathValue("id")
@@ -117,11 +118,26 @@ func UpdateCat(w http.ResponseWriter, r *http.Request) {
 	tx := models.StartTx()
 	defer helper.CommitOrRollback(tx)
 
-	// TODO: Check when cat is already requested to match
-	//
-	//
+	cat, err := models.GetCatById(r.Context(), tx, id)
+	if err != nil {
+		panic(exception.NewNotFoundError("id is not found"))
+	}
 
-	err = models.UpdateCat(r.Context(), tx, id, catRequest)
+	if cat.UserEmail != email {
+		panic(exception.NewNotFoundError("id is not found"))
+	}
+
+	exist := models.CountCatInMatch(r.Context(), tx, idStr)
+
+	if exist > 0 && catRequest.Sex != cat.Sex {
+		panic(exception.NewBadRequestError("Cannot update sex when cat requested to match"))
+	}
+
+	if exist > 0 {
+		err = models.UpdateCatWithSex(r.Context(), tx, id, catRequest)
+	} else {
+		err = models.UpdateCatWithoutSex(r.Context(), tx, id, catRequest)
+	}
 
 	wraper := helper.WebResponse{
 		Message: "success",

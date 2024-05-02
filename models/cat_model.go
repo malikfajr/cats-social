@@ -80,12 +80,12 @@ func GetAllCat(ctx context.Context, tx *sql.Tx, catParam CatParam) []Cat {
 	}
 
 	if race := catParam.Race; race != "" {
-		SQL += fmt.Sprintf(" AND race = $%d", len(params)+1)
+		SQL += fmt.Sprintf(" AND CAST(race AS TEXT) = $%d", len(params)+1)
 		params = append(params, race)
 	}
 
 	if sex := catParam.Sex; sex != "" {
-		SQL += fmt.Sprintf(" AND sex = $%d", len(params)+1)
+		SQL += fmt.Sprintf(" AND CAST(sex AS TEXT) = $%d", len(params)+1)
 		params = append(params, sex)
 	}
 
@@ -183,11 +183,20 @@ func DestroyCat(ctx context.Context, tx *sql.Tx, id int, email string) error {
 	return err
 }
 
-func UpdateCat(ctx context.Context, tx *sql.Tx, id int, cat CatInsertRequest) error {
+func UpdateCatWithSex(ctx context.Context, tx *sql.Tx, id int, cat CatInsertRequest) error {
 	SQL := "UPDATE cats SET name = $1, race = $2, sex = $3, age_in_month = $4, image_urls = $5, description = $6 WHERE id = $7 AND user_email $8 RETURNING id"
 	status := 0
 
 	err := tx.QueryRowContext(ctx, SQL, cat.Name, cat.Race, cat.Sex, cat.AgeInMonth, pq.Array(cat.ImageUrls), cat.Description, id, cat.UserEmail).Scan(&status)
+
+	return err
+}
+
+func UpdateCatWithoutSex(ctx context.Context, tx *sql.Tx, id int, cat CatInsertRequest) error {
+	SQL := "UPDATE cats SET name = $1, race = $2, age_in_month = $4, image_urls = $5, description = $6 WHERE id = $7 AND user_email $8 RETURNING id"
+	status := 0
+
+	err := tx.QueryRowContext(ctx, SQL, cat.Name, cat.Race, cat.AgeInMonth, pq.Array(cat.ImageUrls), cat.Description, id, cat.UserEmail).Scan(&status)
 
 	return err
 }
