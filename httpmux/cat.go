@@ -144,7 +144,7 @@ func UpdateCat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	exist := models.CountCatInMatch(r.Context(), tx, idStr)
-fmt.Println(catRequest.Sex, cat.Sex, exist)
+
 	if exist > 0 && catRequest.Sex != cat.Sex {
 		panic(exception.NewBadRequestError("Cannot update sex when cat requested to match"))
 	}
