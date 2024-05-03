@@ -86,7 +86,7 @@ func CrossCheckMatchCatId(ctx context.Context, tx *sql.Tx, matchCatId string, us
 
 func GetAllMatch(ctx context.Context, tx *sql.Tx, email string) ([]Match, error) {
 	matches := []Match{}
-	SQL := "SELECT id, issued_by, match_cat_detail, user_cat_detail, message, created_at FROM matches WHERE issued_by->>'email' = $1 OR match_user_email = $2"
+	SQL := "SELECT id, issued_by, match_cat_detail, user_cat_detail, message, created_at FROM matches WHERE issued_by->>'email' = $1 OR match_user_email = $2 AND status = 'pending'"
 
 	rows, err := tx.QueryContext(ctx, SQL, email, email)
 	if err != nil {

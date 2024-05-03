@@ -150,9 +150,9 @@ func UpdateCat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if exist > 0 {
-		err = models.UpdateCatWithSex(r.Context(), tx, id, catRequest)
+		_ = models.UpdateCatWithoutSex(r.Context(), tx, id, catRequest)
 	} else {
-		err = models.UpdateCatWithoutSex(r.Context(), tx, id, catRequest)
+		_ = models.UpdateCatWithSex(r.Context(), tx, id, catRequest)
 	}
 
 	wraper := helper.WebResponse{
@@ -162,5 +162,5 @@ func UpdateCat(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	helper.WriteToResponseBody(w, wraper, http.StatusCreated)
+	helper.WriteToResponseBody(w, wraper, http.StatusOK)
 }

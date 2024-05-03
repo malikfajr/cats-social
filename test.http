@@ -95,7 +95,7 @@ Authorization: Bearer {{token3}}
 }
 
 ### GET CAT by user1
-GET http://localhost:8080/v1/cat?id=xxxxx HTTP/1.1
+GET http://localhost:8080/v1/cat? HTTP/1.1
 Content-Type: application/json
 Authorization: Bearer {{token1}}
 
@@ -153,7 +153,27 @@ Authorization: Bearer {{token2}}
 	"matchId":""
 }
 
+###
+GET  http://localhost:8080/v1/cat/match HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer {{token2}}
+
 ### DELETE with other user
 DELETE http://localhost:8080/v1/cat/1 HTTP/1.1
 Content-Type: application/json
 Authorization: Bearer {{token1}}
+
+
+### Update
+PUT http://localhost:8080/v1/cat/4 HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer {{token1}}
+
+{
+    "name": "Update Cat User 1",
+    "race": "Maine Coon",
+    "sex": "female",
+    "ageInMonth": 5,
+    "description": "kucing update",
+    "imageUrls": ["http://google.com"]
+}
