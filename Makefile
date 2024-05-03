@@ -15,6 +15,9 @@ migrateup:
 migratedown:
 	migrate -database $(add_db) -path db/migrations down
 
+compile:
+	env GOOS=linux GOARCH=amd64 go build -o ./build/main main.go
+
 .PHONY: postgres createdb dropdb
 
 

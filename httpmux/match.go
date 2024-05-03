@@ -22,26 +22,30 @@ func CreateMatch(w http.ResponseWriter, r *http.Request) {
 	helper.PanicIfError(err)
 
 	issuerCatId, err := strconv.Atoi(matchBody.UserCatId)
-	helper.PanicIfError(err)
+	if err != nil {
+		panic(exception.NewBadRequestError("user cat id not found"))
+	}
 
 	receiverCatId, err := strconv.Atoi(matchBody.MatchCatId)
-	helper.PanicIfError(err)
+	if err != nil {
+		panic(exception.NewBadRequestError("match cat id not found"))
+	}
 
 	tx := models.StartTx()
 	defer helper.CommitOrRollback(tx)
 
 	issuerCat, err := models.GetCatById(r.Context(), tx, issuerCatId)
 	if err != nil {
-		panic(exception.NewNotFoundError("cat id not found"))
+		panic(exception.NewBadRequestError("user cat id not found"))
 	}
 
 	if issuerCat.UserEmail != email {
-		panic(exception.NewNotFoundError("cat id not found"))
+		panic(exception.NewBadRequestError("userCatId is not belong to the user"))
 	}
 
 	receiverCat, err := models.GetCatById(r.Context(), tx, receiverCatId)
 	if err != nil {
-		panic(exception.NewNotFoundError("cat id not found"))
+		panic(exception.NewBadRequestError("match cat id not found"))
 	}
 
 	if issuerCat.Sex == receiverCat.Sex {
@@ -52,7 +56,7 @@ func CreateMatch(w http.ResponseWriter, r *http.Request) {
 		panic(exception.NewBadRequestError("cannot match the same owner"))
 	}
 
-	matchInsert := models.Match{
+	matchInsert := &models.Match{
 		IssuedBy: models.Issuer{
 			Email:     email,
 			Name:      username,
@@ -86,17 +90,17 @@ func CreateMatch(w http.ResponseWriter, r *http.Request) {
 
 	exist := models.CrossCheckMatchCatId(r.Context(), tx, issuerCat.Id, receiverCat.Id)
 	if exist != 0 {
-		panic(exception.NewNotFoundError("Cat id already submit to match"))
+		panic(exception.NewBadRequestError("Cat id already submit to match"))
 	}
 
 	exist = models.CrossCheckMatchCatId(r.Context(), tx, receiverCat.Id, issuerCat.Id)
 	if exist != 0 {
-		panic(exception.NewNotFoundError("Cat id already submit to match"))
+		panic(exception.NewBadRequestError("Cat id already submit to match"))
 	}
 
-	id, err := models.NewMatch(r.Context(), tx, matchInsert)
+	id, err := models.NewMatch(r.Context(), tx, *matchInsert)
 
-	wrapper := helper.WebResponse{
+	wrapper := &helper.WebResponse{
 		Message: "success",
 		Data: map[string]string{
 			"matchId":   id,
@@ -104,7 +108,7 @@ func CreateMatch(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	helper.WriteToResponseBody(w, wrapper, http.StatusCreated)
+	helper.WriteToResponseBody(w, *wrapper, http.StatusCreated)
 }
 
 func GetMyMatch(w http.ResponseWriter, r *http.Request) {

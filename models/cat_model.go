@@ -106,30 +106,41 @@ func GetAllCat(ctx context.Context, tx *sql.Tx, catParam CatParam) []Cat {
 		}
 	}
 
-	if ageStr := catParam.AgeStr; ageStr != "" {
+	if ageStr := catParam.AgeStr; len(ageStr) > 1 {
 		var operator string
 		var ageValue int
 		var err error
+
+		// TODO: Update validasi
 
 		switch ageStr[0] {
 		case '>':
 			operator = ">"
 			ageValue, err = strconv.Atoi(ageStr[1:])
 			helper.PanicIfError(err)
+			SQL += fmt.Sprintf(" AND age_in_month %s $%d", operator, len(params)+1)
+			params = append(params, ageValue)
 			break
+
 		case '<':
 			operator = "<"
 			ageValue, err = strconv.Atoi(ageStr[1:])
 			helper.PanicIfError(err)
+			SQL += fmt.Sprintf(" AND age_in_month %s $%d", operator, len(params)+1)
+			params = append(params, ageValue)
 			break
-		default:
-			operator = "="
-			ageValue, err = strconv.Atoi(ageStr)
-			helper.PanicIfError(err)
-		}
 
-		SQL += fmt.Sprintf(" AND age_in_month %s $%d", operator, len(params)+1)
-		params = append(params, ageValue)
+		case '=':
+			operator = "="
+			ageValue, err = strconv.Atoi(ageStr[1:])
+			helper.PanicIfError(err)
+
+			SQL += fmt.Sprintf(" AND age_in_month %s $%d", operator, len(params)+1)
+			params = append(params, ageValue)
+			break
+
+		default:
+		}
 	}
 
 	if search := catParam.Search; search != "" {

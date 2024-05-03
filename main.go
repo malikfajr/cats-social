@@ -48,7 +48,7 @@ func use(r *http.ServeMux, middlewares ...func(next http.Handler) http.Handler) 
 
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("%s", r.URL.String())
+		log.Printf("%s %s", r.Method, r.URL.String())
 		next.ServeHTTP(w, r)
 	})
 }

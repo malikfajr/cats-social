@@ -96,7 +96,7 @@ func generateToken(email string, name string) string {
 	myClaims := config.CustomJWTClaim{
 		Email: email,
 		Name:  name,
-		Exp:   jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+		Exp:   jwt.NewNumericDate(time.Now().Add(8 * time.Hour)),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS512, myClaims)
 
