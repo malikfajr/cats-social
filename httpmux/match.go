@@ -23,12 +23,12 @@ func CreateMatch(w http.ResponseWriter, r *http.Request) {
 
 	issuerCatId, err := strconv.Atoi(matchBody.UserCatId)
 	if err != nil {
-		panic(exception.NewBadRequestError("user cat id not found"))
+		panic(exception.NewNotFoundError("user cat id not found"))
 	}
 
 	receiverCatId, err := strconv.Atoi(matchBody.MatchCatId)
 	if err != nil {
-		panic(exception.NewBadRequestError("match cat id not found"))
+		panic(exception.NewNotFoundError("match cat id not found"))
 	}
 
 	tx := models.StartTx()
