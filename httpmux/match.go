@@ -40,7 +40,7 @@ func CreateMatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if issuerCat.UserEmail != email {
-		panic(exception.NewBadRequestError("userCatId is not belong to the user"))
+		panic(exception.NewNotFoundError("userCatId is not belong to the user"))
 	}
 
 	receiverCat, err := models.GetCatById(r.Context(), tx, receiverCatId)

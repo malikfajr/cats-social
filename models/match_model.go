@@ -49,7 +49,7 @@ type Match struct {
 	MatchUserEmail string    `json:"-"`
 	Status         string    `json:"-"`
 	UserCatDetail  CatDetail `json:"userCatDetail"`
-	Message        string    `json:"string"`
+	Message        string    `json:"message"`
 	CreatedAt      time.Time `json:"createdAt"`
 }
 
@@ -200,7 +200,7 @@ func CountCatInMatch(ctx context.Context, tx *sql.Tx, catId string) int {
 	var count int
 	SQL := "SELECT COUNT (*) FROM matches WHERE match_cat_detail->>'id' = $1 OR user_cat_detail->>'id' = $2"
 
-	tx.QueryRowContext(ctx, SQL, catId).Scan(&count)
+	tx.QueryRowContext(ctx, SQL, catId, catId).Scan(&count)
 
 	return count
 }
