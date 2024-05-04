@@ -188,7 +188,7 @@ func GetCatById(ctx context.Context, tx *sql.Tx, Id int) (Cat, error) {
 		return cat, errors.New("cat id is not valid")
 	}
 
-	row.Scan(&cat.Id, &cat.UserEmail, &cat.Name, &cat.Race, &cat.Sex, &cat.AgeInMonth, &cat.ImageUrls, &cat.Description, &cat.HasMatched, &cat.CreatedAt)
+	row.Scan(&cat.Id, &cat.UserEmail, &cat.Name, &cat.Race, &cat.Sex, &cat.AgeInMonth, pq.Array(&cat.ImageUrls), &cat.Description, &cat.HasMatched, &cat.CreatedAt)
 
 	cat.CreatedAt.Format(time.RFC3339)
 	return cat, nil
