@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 
@@ -19,6 +18,7 @@ func main() {
 
 	err := models.InitDb(config.GetDbAddress())
 	helper.PanicIfError(err)
+	log.Println("Database connected")
 
 	router := initializeRoutes()
 	wrapper := use(router, loggingMiddleware, exception.RecoverWrap)
@@ -95,7 +95,7 @@ func initializeRoutes() *http.ServeMux {
 			return
 		}
 
-		fmt.Fprint(w, "hello world")
+		helper.WriteToResponseBody(w, "hello world!", http.StatusOK)
 	})
 
 	mux.HandleFunc("POST /v1/user/register", httpmux.RegisterHandler)

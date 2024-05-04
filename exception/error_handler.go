@@ -1,7 +1,7 @@
 package exception
 
 import (
-	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/go-playground/validator/v10"
@@ -77,12 +77,12 @@ func badRequestError(writer http.ResponseWriter, request *http.Request, err inte
 	}
 }
 func validationError(writer http.ResponseWriter, request *http.Request, err interface{}) bool {
-	exception, ok := err.(validator.ValidationErrors)
+	_, ok := err.(validator.ValidationErrors)
 	if ok {
-		message := ""
-		for _, e := range exception {
-			message += fmt.Sprintf(" %s %s;", e.Field(), e.Tag())
-		}
+		message := "bad request"
+		// for _, e := range exception {
+		// 	message += fmt.Sprintf(" %s %s;", e.Field(), e.Tag())
+		// }
 		webResponse := helper.WebResponse{
 			Message: message,
 			Data:    nil,
@@ -96,7 +96,7 @@ func validationError(writer http.ResponseWriter, request *http.Request, err inte
 }
 
 func internalServerError(writer http.ResponseWriter, request *http.Request, err interface{}) {
-	fmt.Println(err)
+	log.Println(err)
 
 	webResponse := helper.WebResponse{
 		Message: "Internal server error",
