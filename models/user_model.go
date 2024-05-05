@@ -37,6 +37,7 @@ func GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (User, error)
 	if err != nil {
 		panic(err)
 	}
+	defer row.Close()
 
 	if row.Next() == false {
 		return user, errors.New("user not found")

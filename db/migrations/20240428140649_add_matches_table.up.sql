@@ -10,3 +10,9 @@ CREATE TABLE IF NOT EXISTS matches (
     status STATUS_MATCH DEFAULT 'pending',
     created_at TIMESTAMP DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_match_created_at ON matches(created_at);
+
+CREATE INDEX IF NOT EXISTS idx_match_status ON matches(status);
+
+CREATE INDEX IF NOT EXISTS idx_match_issued_by ON matches(issued_by);

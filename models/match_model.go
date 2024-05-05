@@ -92,6 +92,7 @@ func GetAllMatch(ctx context.Context, tx *sql.Tx, email string) ([]Match, error)
 	if err != nil {
 		return matches, err
 	}
+	defer rows.Close()
 
 	for rows.Next() {
 		match := &Match{}

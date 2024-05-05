@@ -16,10 +16,14 @@ func main() {
 	config.InitEnv()
 	httpmux.InitValidator()
 
-	err := models.InitDb(config.GetDbAddress())
+	db, err := models.InitDb(config.GetDbAddress())
 	helper.PanicIfError(err)
+	defer db.Close()
 	log.Println("Database connected")
 
+	db.SetMaxIdleConns(80)
+
+	db.SetMaxOpenConns(100)
 	router := initializeRoutes()
 	wrapper := use(router, loggingMiddleware, exception.RecoverWrap)
 

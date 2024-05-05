@@ -8,15 +8,15 @@ import (
 
 var db *sql.DB
 
-func InitDb(url string) error {
+func InitDb(url string) (*sql.DB, error) {
 	var err error
 
 	db, err = sql.Open("postgres", url)
 	if err != nil {
-		return err
+		return db, err
 	}
 
-	return db.Ping()
+	return db, db.Ping()
 }
 
 func StartTx() *sql.Tx {
