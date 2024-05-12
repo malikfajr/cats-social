@@ -1,8 +1,13 @@
 package main
 
 import (
+	"context"
 	"log"
+	"math"
 	"net/http"
+	"os"
+	"strconv"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/malikfajr/cats-social/config"
@@ -19,11 +24,31 @@ func main() {
 	db, err := models.InitDb(config.GetDbAddress())
 	helper.PanicIfError(err)
 	defer db.Close()
-	log.Println("Database connected")
 
-	db.SetMaxIdleConns(80)
+	if db.Ping() != nil {
+		log.Println("Database error connection")
+		os.Exit(1)
+	} else {
+		log.Println("Database connected")
+	}
 
-	db.SetMaxOpenConns(100)
+	var maxConnStr string
+	var maxConn int
+
+	if err := db.QueryRow("SHOW max_connections").Scan(&maxConnStr); err != nil {
+		maxConn = 1
+	} else {
+		n, err := strconv.ParseFloat(maxConnStr, 64)
+		helper.PanicIfError(err)
+
+		maxConn = int(math.Floor(n * 0.9))
+		if maxConn < 1 {
+			maxConn = 1
+		}
+	}
+
+	db.SetMaxOpenConns(maxConn)
+
 	router := initializeRoutes()
 	wrapper := use(router, loggingMiddleware, exception.RecoverWrap)
 
@@ -52,8 +77,9 @@ func use(r *http.ServeMux, middlewares ...func(next http.Handler) http.Handler) 
 
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("%s %s", r.Method, r.URL.String())
+		t := time.Now()
 		next.ServeHTTP(w, r)
+		log.Println(r.Method, r.URL.String(), time.Since(t))
 	})
 }
 
@@ -78,9 +104,9 @@ func authMiddleware(next http.Handler) http.Handler {
 			return
 		}
 		if claims, ok := token.Claims.(*config.CustomJWTClaim); ok {
-			r.Header.Set("email", claims.Email)
-			r.Header.Set("name", claims.Name)
-			next.ServeHTTP(w, r)
+			ctx := context.WithValue(r.Context(), "user.id", claims.ID)
+			req := r.WithContext(ctx)
+			next.ServeHTTP(w, req)
 		} else {
 			w.WriteHeader(http.StatusUnauthorized)
 			w.Write([]byte("invalid token"))
@@ -117,11 +143,11 @@ func initializeRoutes() *http.ServeMux {
 	GetMatch := http.HandlerFunc(httpmux.GetMyMatch)
 	mux.Handle("GET /v1/cat/match", authMiddleware(GetMatch))
 
-	ApproveMatch := http.HandlerFunc(httpmux.ApproveMatch)
-	mux.Handle("POST /v1/cat/match/approve", authMiddleware(ApproveMatch))
+	// ApproveMatch := http.HandlerFunc(httpmux.ApproveMatch)
+	// mux.Handle("POST /v1/cat/match/approve", authMiddleware(ApproveMatch))
 
-	RejectMatch := http.HandlerFunc(httpmux.RejectMatch)
-	mux.Handle("POST /v1/cat/match/reject", authMiddleware(RejectMatch))
+	// RejectMatch := http.HandlerFunc(httpmux.RejectMatch)
+	// mux.Handle("POST /v1/cat/match/reject", authMiddleware(RejectMatch))
 
 	DeleteMatch := http.HandlerFunc(httpmux.DeleteMatch)
 	mux.Handle("DELETE /v1/cat/match/{id}", authMiddleware(DeleteMatch))

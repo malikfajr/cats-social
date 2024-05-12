@@ -27,3 +27,7 @@ func StartTx() *sql.Tx {
 
 	return tx
 }
+
+func GetDb() *sql.DB {
+	return db
+}

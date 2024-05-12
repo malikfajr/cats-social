@@ -5,20 +5,23 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/malikfajr/cats-social/helper"
+	"github.com/malikfajr/cats-social/exception"
 )
 
 type User struct {
+	Id       int    `json:"-"`
 	Email    string `json:"email" validate:"required,email"`
 	Name     string `json:"name" validate:"required,min=5,max=50"`
 	Password string `json:"password" validate:"required,min=5,max=15"`
 }
 
 func SaveUser(ctx context.Context, tx *sql.Tx, user User) User {
-	SQL := "INSERT INTO users (email, name, password) VALUES ($1, $2, $3);"
+	SQL := "INSERT INTO users (email, name, password) VALUES ($1, $2, $3) RETURNING id;"
 
-	_, err := tx.ExecContext(ctx, SQL, user.Email, user.Name, user.Password)
-	helper.PanicIfError(err)
+	err := tx.QueryRowContext(ctx, SQL, user.Email, user.Name, user.Password).Scan(&user.Id)
+	if err != nil {
+		panic(exception.NewConflictError("Email is exists"))
+	}
 
 	return user
 }
@@ -28,12 +31,12 @@ type Credential struct {
 	Password string `json:"password" validate:"required,string,min=5,max=15"`
 }
 
-func GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (User, error) {
+func GetUserByEmail(ctx context.Context, db *sql.DB, email string) (User, error) {
 	user := User{}
 
-	SQL := "SELECT email, password, name FROM users WHERE email = $1;"
+	SQL := "SELECT id, email, password, name FROM users WHERE email = $1 LIMIT 1;"
 
-	row, err := tx.QueryContext(ctx, SQL, email)
+	row, err := db.QueryContext(ctx, SQL, email)
 	if err != nil {
 		panic(err)
 	}
@@ -43,6 +46,6 @@ func GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (User, error)
 		return user, errors.New("user not found")
 	}
 
-	row.Scan(&user.Email, &user.Password, &user.Name)
+	row.Scan(&user.Id, &user.Email, &user.Password, &user.Name)
 	return user, nil
 }

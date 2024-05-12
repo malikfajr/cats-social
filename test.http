@@ -95,7 +95,7 @@ Authorization: Bearer {{token3}}
 }
 
 ### GET CAT by user1
-GET http://localhost:8080/v1/cat?ageInMonth==56336 HTTP/1.1
+GET http://localhost:8080/v1/cat?owned=false HTTP/1.1
 Content-Type: application/json
 Authorization: Bearer {{token1}}
 
@@ -117,8 +117,8 @@ Content-Type: application/json
 Authorization: Bearer {{token1}}
 
 {
-    "matchCatId": "2",
-	"userCatId": "1",
+    "matchCatId": "917ff5f0-5263-4924-8ab1-d73621f801ea",
+	"userCatId": "737c3a39-b2b0-4377-bd69-5fc2d5d53ee3",
     "message": "Ayo ketemuan"
 }
 

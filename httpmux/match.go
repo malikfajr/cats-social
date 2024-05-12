@@ -3,7 +3,6 @@ package httpmux
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/malikfajr/cats-social/exception"
@@ -12,8 +11,8 @@ import (
 )
 
 func CreateMatch(w http.ResponseWriter, r *http.Request) {
-	email := r.Header.Get("email")
-	username := r.Header.Get("name")
+	userId := r.Context().Value("user.id").(int)
+
 	matchBody := models.MatchInsertRequest{}
 
 	json.NewDecoder(r.Body).Decode(&matchBody)
@@ -21,29 +20,19 @@ func CreateMatch(w http.ResponseWriter, r *http.Request) {
 	err := validate.Struct(matchBody)
 	helper.PanicIfError(err)
 
-	issuerCatId, err := strconv.Atoi(matchBody.UserCatId)
-	if err != nil {
-		panic(exception.NewNotFoundError("user cat id not found"))
-	}
-
-	receiverCatId, err := strconv.Atoi(matchBody.MatchCatId)
-	if err != nil {
-		panic(exception.NewNotFoundError("match cat id not found"))
-	}
-
 	tx := models.StartTx()
 	defer helper.CommitOrRollback(tx)
 
-	issuerCat, err := models.GetCatById(r.Context(), tx, issuerCatId)
+	issuerCat, err := models.GetCatById(r.Context(), tx, matchBody.UserCatId)
 	if err != nil {
 		panic(exception.NewBadRequestError("user cat id not found"))
 	}
 
-	if issuerCat.UserEmail != email {
+	if issuerCat.UserId != userId {
 		panic(exception.NewNotFoundError("userCatId is not belong to the user"))
 	}
 
-	receiverCat, err := models.GetCatById(r.Context(), tx, receiverCatId)
+	receiverCat, err := models.GetCatById(r.Context(), tx, matchBody.MatchCatId)
 	if err != nil {
 		panic(exception.NewBadRequestError("match cat id not found"))
 	}
@@ -52,59 +41,30 @@ func CreateMatch(w http.ResponseWriter, r *http.Request) {
 		panic(exception.NewBadRequestError("gender cannot same"))
 	}
 
-	if issuerCat.UserEmail == receiverCat.UserEmail {
+	if issuerCat.UserId == receiverCat.UserId {
 		panic(exception.NewBadRequestError("cannot match the same owner"))
 	}
 
-	matchInsert := &models.Match{
-		IssuedBy: models.Issuer{
-			Email:     email,
-			Name:      username,
-			CreatedAt: time.Now(),
-		},
-		MatchUserEmail: receiverCat.UserEmail,
-		MatchCatDetail: models.CatDetail{
-			Id:          receiverCat.Id,
-			Name:        receiverCat.Name,
-			Race:        receiverCat.Race,
-			Sex:         receiverCat.Sex,
-			Description: receiverCat.Description,
-			AgeInMonth:  receiverCat.AgeInMonth,
-			ImageUrls:   receiverCat.ImageUrls,
-			HasMatched:  receiverCat.HasMatched,
-			CreatedAt:   receiverCat.CreatedAt,
-		},
-		UserCatDetail: models.CatDetail{
-			Id:          issuerCat.Id,
-			Name:        issuerCat.Name,
-			Race:        issuerCat.Race,
-			Sex:         issuerCat.Sex,
-			Description: issuerCat.Description,
-			AgeInMonth:  issuerCat.AgeInMonth,
-			ImageUrls:   issuerCat.ImageUrls,
-			HasMatched:  issuerCat.HasMatched,
-			CreatedAt:   issuerCat.CreatedAt,
-		},
-		Message: matchBody.Message,
+	matchInsert := &models.MatchInsertPayload{
+		IssuedUserId: userId,
+		MatchUserId:  receiverCat.UserId,
+		UserCatId:    matchBody.UserCatId,
+		MatchCatId:   matchBody.MatchCatId,
+		Message:      matchBody.Message,
 	}
 
-	exist := models.CrossCheckMatchCatId(r.Context(), tx, issuerCat.Id, receiverCat.Id)
+	exist := models.CrossCheckMatchCatId(r.Context(), tx, matchInsert.MatchCatId, matchBody.UserCatId)
 	if exist != 0 {
 		panic(exception.NewBadRequestError("Cat id already submit to match"))
 	}
 
-	exist = models.CrossCheckMatchCatId(r.Context(), tx, receiverCat.Id, issuerCat.Id)
-	if exist != 0 {
-		panic(exception.NewBadRequestError("Cat id already submit to match"))
-	}
-
-	id, err := models.NewMatch(r.Context(), tx, *matchInsert)
+	id, createdAt, err := models.NewMatch(r.Context(), tx, matchInsert)
 
 	wrapper := &helper.WebResponse{
 		Message: "success",
 		Data: map[string]string{
 			"matchId":   id,
-			"createdAt": matchInsert.IssuedBy.CreatedAt.Format(time.RFC3339),
+			"createdAt": createdAt.Format(time.RFC3339),
 		},
 	}
 
@@ -112,12 +72,11 @@ func CreateMatch(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetMyMatch(w http.ResponseWriter, r *http.Request) {
-	email := r.Header.Get("email")
+	userId := r.Context().Value("user.id").(int)
 
-	tx := models.StartTx()
-	defer helper.CommitOrRollback(tx)
+	db := models.GetDb()
 
-	matches, err := models.GetAllMatch(r.Context(), tx, email)
+	matches, err := models.GetAllMatch(r.Context(), db, userId)
 	helper.PanicIfError(err)
 
 	wrapper := &helper.WebResponse{
@@ -129,7 +88,7 @@ func GetMyMatch(w http.ResponseWriter, r *http.Request) {
 }
 
 func ApproveMatch(w http.ResponseWriter, r *http.Request) {
-	email := r.Header.Get("email")
+	userId := r.Context().Value("user.id").(int)
 	var bodyRequest models.ApproveRemoveRequest
 
 	json.NewDecoder(r.Body).Decode(&bodyRequest)
@@ -147,8 +106,8 @@ func ApproveMatch(w http.ResponseWriter, r *http.Request) {
 		panic(exception.NewNotFoundError("match id not found"))
 	}
 
-	// check valid email, if the user is not valid receiver match
-	if email != match.MatchUserEmail {
+	// check valid userId, if the user is not valid receiver match
+	if userId != match.MatchUserId {
 		panic(exception.NewNotFoundError("match id not found"))
 	}
 
@@ -157,8 +116,7 @@ func ApproveMatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	models.ApproveMatch(r.Context(), tx, matchId)
-	models.RejectOtherMatch(r.Context(), tx, match.MatchCatDetail.Id, matchId)
-	models.RejectOtherMatch(r.Context(), tx, match.UserCatDetail.Id, matchId)
+	models.RejectOtherMatch(r.Context(), tx, match.MatchCatDetail.Id, match.UserCatDetail.Id, matchId)
 
 	models.UpdateStatusCat(r.Context(), tx, match.MatchCatDetail.Id, match.UserCatDetail.Id)
 
@@ -166,7 +124,7 @@ func ApproveMatch(w http.ResponseWriter, r *http.Request) {
 }
 
 func RejectMatch(w http.ResponseWriter, r *http.Request) {
-	email := r.Header.Get("email")
+	userId := r.Context().Value("user.id").(int)
 	matchId := r.PathValue("id")
 
 	tx := models.StartTx()
@@ -178,7 +136,7 @@ func RejectMatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// check valid email, if the user is not valid receiver match
-	if email != match.MatchUserEmail {
+	if userId != match.MatchUserId {
 		panic(exception.NewNotFoundError("match id not found"))
 	}
 
@@ -193,17 +151,17 @@ func RejectMatch(w http.ResponseWriter, r *http.Request) {
 
 func DeleteMatch(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	issuerEmail := r.Header.Get("email")
+	userId := r.Context().Value("user.id").(int)
 
 	tx := models.StartTx()
 	defer helper.CommitOrRollback(tx)
 
-	status, email, err := models.DeleteMatch(r.Context(), tx, id)
+	status, issuedUserId, err := models.DeleteMatch(r.Context(), tx, id)
 	if err != nil {
 		panic(exception.NewNotFoundError("match id not found"))
 	}
 
-	if email != issuerEmail {
+	if issuedUserId != userId {
 		panic(exception.NewBadRequestError("You not issuer"))
 	}
 

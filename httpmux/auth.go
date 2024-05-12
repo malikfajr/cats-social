@@ -26,10 +26,9 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	err := validate.Struct(credential)
 	helper.PanicIfError(err)
 
-	tx := models.StartTx()
-	defer helper.CommitOrRollback(tx)
+	db := models.GetDb()
 
-	user, err := models.GetUserByEmail(r.Context(), tx, credential.Email)
+	user, err := models.GetUserByEmail(r.Context(), db, credential.Email)
 	if err != nil {
 		panic(exception.NewNotFoundError(err.Error()))
 	}
@@ -42,7 +41,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	data := map[string]string{
 		"email":       user.Email,
 		"name":        user.Name,
-		"accessToken": generateToken(user.Email, user.Name),
+		"accessToken": generateToken(user.Id, user.Email, user.Name),
 	}
 
 	wrapper := helper.WebResponse{
@@ -71,17 +70,12 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	tx := models.StartTx()
 	defer helper.CommitOrRollback(tx)
 
-	_, err = models.GetUserByEmail(r.Context(), tx, user.Email)
-	if err == nil {
-		panic(exception.NewConflictError("Email has taken"))
-	}
-
 	newUser := models.SaveUser(r.Context(), tx, user)
 
 	data := map[string]string{
 		"email":       newUser.Email,
 		"name":        newUser.Name,
-		"accessToken": generateToken(newUser.Email, newUser.Name),
+		"accessToken": generateToken(newUser.Id, newUser.Email, newUser.Name),
 	}
 
 	wrapper := helper.WebResponse{
@@ -92,8 +86,9 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	helper.WriteToResponseBody(w, wrapper, http.StatusCreated)
 }
 
-func generateToken(email string, name string) string {
+func generateToken(userId int, email string, name string) string {
 	myClaims := config.CustomJWTClaim{
+		ID:    userId,
 		Email: email,
 		Name:  name,
 		Exp:   jwt.NewNumericDate(time.Now().Add(8 * time.Hour)),
@@ -104,8 +99,4 @@ func generateToken(email string, name string) string {
 	helper.PanicIfError(err)
 
 	return ss
-}
-
-func Check(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Protected" + r.Header.Get("email")))
 }

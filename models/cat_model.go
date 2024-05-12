@@ -15,7 +15,7 @@ import (
 
 type Cat struct {
 	Id          string    `json:"id"`
-	UserEmail   string    `json:"-"`
+	UserId      int       `json:"-"`
 	Name        string    `json:"name"`
 	Race        string    `json:"race"`
 	Sex         string    `json:"sex"`
@@ -27,7 +27,7 @@ type Cat struct {
 }
 
 type CatInsertRequest struct {
-	UserEmail   string   `json:"userEmail"`
+	UserId      int      `json:"-"`
 	Name        string   `json:"name" validate:"required,min=1,max=30"`
 	Race        string   `json:"race" validate:"required,oneof='Persian' 'Maine Coon' 'Siamese' 'Ragdoll' 'Bengal' 'Sphynx' 'British Shorthair' 'Abyssinian' 'Scottish Fold' 'Birman'"`
 	Sex         string   `json:"sex" validate:"required,oneof=male female"`
@@ -36,12 +36,12 @@ type CatInsertRequest struct {
 	ImageUrls   []string `json:"imageUrls" validate:"required,dive,required,url"`
 }
 
-func SaveCat(ctx context.Context, tx *sql.Tx, cat CatInsertRequest) (int, time.Time) {
-	SQL := "INSERT INTO cats (user_email, name, race, sex, age_in_month, image_urls, description) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, created_at"
-	id := 0
+func SaveCat(ctx context.Context, tx *sql.Tx, cat CatInsertRequest) (string, time.Time) {
+	SQL := "INSERT INTO cats (user_id, name, race, sex, age_in_month, image_urls, description) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, created_at"
+	var id string
 	var createdAt time.Time
 
-	err := tx.QueryRowContext(ctx, SQL, cat.UserEmail, cat.Name, cat.Race, cat.Sex, cat.AgeInMonth, pq.Array(cat.ImageUrls), cat.Description).Scan(&id, &createdAt)
+	err := tx.QueryRowContext(ctx, SQL, cat.UserId, cat.Name, cat.Race, cat.Sex, cat.AgeInMonth, pq.Array(cat.ImageUrls), cat.Description).Scan(&id, &createdAt)
 	helper.PanicIfError(err)
 
 	createdAt.Format(time.RFC3339)
@@ -52,7 +52,7 @@ func SaveCat(ctx context.Context, tx *sql.Tx, cat CatInsertRequest) (int, time.T
 type CatParam struct {
 	Id            string
 	Owned         string
-	Email         string
+	UserId        int
 	AgeStr        string
 	HasMatchedStr string
 	Race          string
@@ -62,8 +62,8 @@ type CatParam struct {
 	Offsset       string
 }
 
-func GetAllCat(ctx context.Context, tx *sql.Tx, catParam CatParam) []Cat {
-	SQL := "SELECT id, name, race, sex, age_in_month, image_urls, description, hasmatched, created_at FROM cats WHERE TRUE"
+func GetAllCat(ctx context.Context, db *sql.DB, catParam CatParam) []Cat {
+	SQL := "SELECT id, name, race, sex, age_in_month, image_urls, description, hasmatched, created_at FROM cats WHERE deleted_at IS NULL"
 
 	params := make([]interface{}, 0)
 
@@ -71,21 +71,18 @@ func GetAllCat(ctx context.Context, tx *sql.Tx, catParam CatParam) []Cat {
 		owned, err := strconv.ParseBool(catParam.Owned)
 		if err == nil {
 			if owned == true {
-				SQL += " AND user_email = $1"
+				SQL += " AND user_id = $1"
 			} else {
-				SQL += " AND user_email != $1 "
+				SQL += " AND user_id != $1 "
 			}
 
-			params = append(params, catParam.Email)
+			params = append(params, catParam.UserId)
 		}
 	}
 
 	if catParam.Id != "" {
-		id, err := strconv.Atoi(catParam.Id)
-		if err == nil {
-			SQL += fmt.Sprintf(" AND id = $%d", len(params)+1)
-			params = append(params, id)
-		}
+		SQL += fmt.Sprintf(" AND id = $%d", len(params)+1)
+		params = append(params, catParam.Id)
 	}
 
 	if race := catParam.Race; race != "" {
@@ -160,7 +157,7 @@ func GetAllCat(ctx context.Context, tx *sql.Tx, catParam CatParam) []Cat {
 
 	SQL += fmt.Sprintf(" ORDER BY created_at DESC LIMIT %d OFFSET %d", limit, offset)
 
-	rows, err := tx.QueryContext(ctx, SQL, params...)
+	rows, err := db.QueryContext(ctx, SQL, params...)
 	helper.PanicIfError(err)
 	defer rows.Close()
 
@@ -176,11 +173,11 @@ func GetAllCat(ctx context.Context, tx *sql.Tx, catParam CatParam) []Cat {
 	return cats
 }
 
-func GetCatById(ctx context.Context, tx *sql.Tx, Id int) (Cat, error) {
+func GetCatById(ctx context.Context, tx *sql.Tx, catId string) (Cat, error) {
 	cat := Cat{}
-	SQL := "SELECT id, user_email, name, race, sex, age_in_month, image_urls, description, hasmatched, created_at FROM cats WHERE id = $1;"
+	SQL := "SELECT id, user_id, name, race, sex, age_in_month, image_urls, description, hasmatched, created_at FROM cats WHERE id = $1 LIMIT 1;"
 
-	row, err := tx.QueryContext(ctx, SQL, Id)
+	row, err := tx.QueryContext(ctx, SQL, catId)
 	helper.PanicIfError(err)
 	defer row.Close()
 
@@ -188,35 +185,40 @@ func GetCatById(ctx context.Context, tx *sql.Tx, Id int) (Cat, error) {
 		return cat, errors.New("cat id is not valid")
 	}
 
-	row.Scan(&cat.Id, &cat.UserEmail, &cat.Name, &cat.Race, &cat.Sex, &cat.AgeInMonth, pq.Array(&cat.ImageUrls), &cat.Description, &cat.HasMatched, &cat.CreatedAt)
+	row.Scan(&cat.Id, &cat.UserId, &cat.Name, &cat.Race, &cat.Sex, &cat.AgeInMonth, pq.Array(&cat.ImageUrls), &cat.Description, &cat.HasMatched, &cat.CreatedAt)
 
 	cat.CreatedAt.Format(time.RFC3339)
 	return cat, nil
 }
 
-func DestroyCat(ctx context.Context, tx *sql.Tx, id int, email string) error {
-	status := 0
-	SQL := "DELETE FROM cats WHERE id = $1 AND user_email = $2 RETURNING id;"
+func DestroyCat(ctx context.Context, tx *sql.Tx, catId string, userId int) error {
+	SQL := "UPDATE cats SET deleted_at = NOW() WHERE id = $1 AND user_id = $2;"
 
-	err := tx.QueryRowContext(ctx, SQL, id, email).Scan(&status)
+	result, err := tx.ExecContext(ctx, SQL, catId, userId)
+	helper.PanicIfError(err)
+
+	n, err := result.RowsAffected()
+	if n > 0 {
+		return nil
+	} else {
+		return errors.New("id not found")
+	}
+}
+
+func UpdateCatWithSex(ctx context.Context, tx *sql.Tx, catId string, cat CatInsertRequest) error {
+	SQL := "UPDATE cats SET name = $1, race = $2, sex = $3, age_in_month = $4, image_urls = $5, description = $6 WHERE id = $7 AND user_id = $8 RETURNING id"
+	status := 0
+
+	err := tx.QueryRowContext(ctx, SQL, cat.Name, cat.Race, cat.Sex, cat.AgeInMonth, pq.Array(cat.ImageUrls), cat.Description, catId, cat.UserId).Scan(&status)
 
 	return err
 }
 
-func UpdateCatWithSex(ctx context.Context, tx *sql.Tx, id int, cat CatInsertRequest) error {
-	SQL := "UPDATE cats SET name = $1, race = $2, sex = $3, age_in_month = $4, image_urls = $5, description = $6 WHERE id = $7 AND user_email = $8 RETURNING id"
+func UpdateCatWithoutSex(ctx context.Context, tx *sql.Tx, catId string, cat CatInsertRequest) error {
+	SQL := "UPDATE cats SET name = $1, race = $2, age_in_month = $3, image_urls = $3, description = $5 WHERE id = $6 AND user_id = $7 RETURNING id"
 	status := 0
 
-	err := tx.QueryRowContext(ctx, SQL, cat.Name, cat.Race, cat.Sex, cat.AgeInMonth, pq.Array(cat.ImageUrls), cat.Description, id, cat.UserEmail).Scan(&status)
-
-	return err
-}
-
-func UpdateCatWithoutSex(ctx context.Context, tx *sql.Tx, id int, cat CatInsertRequest) error {
-	SQL := "UPDATE cats SET name = $1, race = $2, age_in_month = $3, image_urls = $3, description = $5 WHERE id = $6 AND user_email = $7 RETURNING id"
-	status := 0
-
-	err := tx.QueryRowContext(ctx, SQL, cat.Name, cat.Race, cat.AgeInMonth, pq.Array(cat.ImageUrls), cat.Description, id, cat.UserEmail).Scan(&status)
+	err := tx.QueryRowContext(ctx, SQL, cat.Name, cat.Race, cat.AgeInMonth, pq.Array(cat.ImageUrls), cat.Description, catId, cat.UserId).Scan(&status)
 
 	return err
 }

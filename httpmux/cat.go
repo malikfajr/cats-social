@@ -2,9 +2,7 @@ package httpmux
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/malikfajr/cats-social/exception"
 	"github.com/malikfajr/cats-social/helper"
@@ -30,6 +28,7 @@ var SexEnum = map[string]bool{
 }
 
 func SaveCat(w http.ResponseWriter, r *http.Request) {
+	userId := r.Context().Value("user.id").(int)
 	catRequest := models.CatInsertRequest{}
 
 	json.NewDecoder(r.Body).Decode(&catRequest)
@@ -37,7 +36,7 @@ func SaveCat(w http.ResponseWriter, r *http.Request) {
 	err := validate.Struct(catRequest)
 	helper.PanicIfError(err)
 
-	catRequest.UserEmail = r.Header.Get("email")
+	catRequest.UserId = userId
 
 	tx := models.StartTx()
 	defer helper.CommitOrRollback(tx)
@@ -46,7 +45,7 @@ func SaveCat(w http.ResponseWriter, r *http.Request) {
 	wraper := helper.WebResponse{
 		Message: "success",
 		Data: map[string]interface{}{
-			"id":        fmt.Sprintf("%d", id),
+			"id":        id,
 			"createdAt": date,
 		},
 	}
@@ -59,7 +58,7 @@ func GetCat(w http.ResponseWriter, r *http.Request) {
 	catParam := models.CatParam{
 		Id:            r.URL.Query().Get("id"),
 		Owned:         r.URL.Query().Get("owned"),
-		Email:         r.Header.Get("email"),
+		UserId:        r.Context().Value("user.id").(int),
 		AgeStr:        r.URL.Query().Get("ageInMonth"),
 		HasMatchedStr: r.URL.Query().Get("hasMatched"),
 		Race:          r.URL.Query().Get("race"),
@@ -77,10 +76,9 @@ func GetCat(w http.ResponseWriter, r *http.Request) {
 		catParam.Sex = ""
 	}
 
-	tx := models.StartTx()
-	defer helper.CommitOrRollback(tx)
+	db := models.GetDb()
 
-	data = models.GetAllCat(r.Context(), tx, catParam)
+	data = models.GetAllCat(r.Context(), db, catParam)
 
 	wrapper := helper.WebResponse{
 		Message: "success",
@@ -91,17 +89,14 @@ func GetCat(w http.ResponseWriter, r *http.Request) {
 }
 
 func DestroyCat(w http.ResponseWriter, r *http.Request) {
-	email := r.Header.Get("email")
-	idStr := r.PathValue("id")
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		panic(exception.NewNotFoundError("id not found"))
-	}
+	userId := r.Context().Value("user.id").(int)
+	id := r.PathValue("id")
 
 	tx := models.StartTx()
 	defer helper.CommitOrRollback(tx)
 
-	err = models.DestroyCat(r.Context(), tx, id, email)
+	err := models.DestroyCat(r.Context(), tx, id, userId)
+
 	if err != nil {
 		panic(exception.NewNotFoundError("id is not found"))
 	}
@@ -115,21 +110,19 @@ func DestroyCat(w http.ResponseWriter, r *http.Request) {
 }
 
 func UpdateCat(w http.ResponseWriter, r *http.Request) {
-	email := r.Header.Get("email")
+	userId := r.Context().Value("user.id").(int)
 	catRequest := models.CatInsertRequest{}
 
-	idStr := r.PathValue("id")
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		panic(exception.NewNotFoundError("id is not found"))
-	}
+	id := r.PathValue("id")
 
 	json.NewDecoder(r.Body).Decode(&catRequest)
 
-	err = validate.Struct(catRequest)
+	catRequest.UserId = userId
+
+	err := validate.Struct(catRequest)
 	helper.PanicIfError(err)
 
-	catRequest.UserEmail = r.Header.Get("email")
+	catRequest.UserId = catRequest.UserId
 
 	tx := models.StartTx()
 	defer helper.CommitOrRollback(tx)
@@ -139,11 +132,11 @@ func UpdateCat(w http.ResponseWriter, r *http.Request) {
 		panic(exception.NewNotFoundError("id is not found"))
 	}
 
-	if cat.UserEmail != email {
+	if cat.UserId != userId {
 		panic(exception.NewNotFoundError("id is not found"))
 	}
 
-	exist := models.CountCatInMatch(r.Context(), tx, idStr)
+	exist := models.CountCatInMatch(r.Context(), tx, id)
 
 	if exist > 0 && catRequest.Sex != cat.Sex {
 		panic(exception.NewBadRequestError("Cannot update sex when cat requested to match"))
@@ -158,7 +151,7 @@ func UpdateCat(w http.ResponseWriter, r *http.Request) {
 	wraper := helper.WebResponse{
 		Message: "success",
 		Data: map[string]interface{}{
-			"id": fmt.Sprintf("%d", id),
+			"id": id,
 		},
 	}
 
